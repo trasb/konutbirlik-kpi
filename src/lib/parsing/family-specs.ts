@@ -1,4 +1,5 @@
 import { SeparateSheetsFamilySpec } from "./generic-separate-sheets";
+import { MultiBlockFamilySpec } from "./generic-multi-block";
 
 export const SEPARATE_SHEETS_FAMILIES: SeparateSheetsFamilySpec[] = [
   {
@@ -84,5 +85,50 @@ export const SEPARATE_SHEETS_FAMILIES: SeparateSheetsFamilySpec[] = [
       { sheetName: "Ekip", level: "ekip" },
     ],
     matchSignal: { sheetName: "Müdürlük", cellText: "Teyitten Dönen" },
+  },
+  {
+    id: "T34",
+    metrics: [{ kpiCode: "T34_IPTV_TEKRAR_ARIZA" }],
+    sheets: [
+      { sheetName: "Tekrar Arıza Oranı-Müdürlük", level: "mudurluk" },
+      { sheetName: "Tekrar Arıza Oranı-Amirlik", level: "amirlik" },
+    ],
+  },
+];
+
+export const MULTI_BLOCK_FAMILIES: MultiBlockFamilySpec[] = [
+  {
+    id: "T18",
+    sheetName: "T18 - Toplam",
+    kpiCode: "T18_BASARILI_ELITT",
+    blocks: ["mudurluk", "amirlik", "ekip"],
+    oranIsFraction: true,
+    matchSignal: { cellText: "Başarılı EliTT Oranı" },
+  },
+  {
+    id: "T8",
+    sheetName: "TM",
+    kpiCode: "T8_DONUSUM_TAMAMLANMA",
+    blocks: ["mudurluk", "amirlik", "ekip"],
+    oranIsFraction: true,
+    // T32 dosyası da "TM" adında bir sayfaya sahip; bu metinle ayırt ediyoruz.
+    matchSignal: { cellText: "Başarılı Tamamlanma Oranı" },
+  },
+  {
+    id: "T25_STANDALONE",
+    sheetName: "T25 - TOPLAM",
+    kpiCode: "T25_KURULUM_TAMAMLANMA",
+    blocks: ["mudurluk", "amirlik", "ekip"],
+  },
+  {
+    id: "T33_STANDALONE",
+    sheetName: "T33 - TOPLAM",
+    kpiCode: "T33_TEKRAR_EDEN_ARIZA",
+    // "Müdürlük (Aristo Hariç)" ve "Ekip" bloklarını atlıyoruz: Aristo-hariç varyantı ayrı bir
+    // KPI değil; Ekip bloğu ise "tekrara sebep olan ekip" perspektifiyle NVS'nin "ıslah eden
+    // ekip" perspektifinden farklı bir anlam taşıyor — aynı KPI koduna karışırsa veriler
+    // birbirinin üzerine yanlış anlamla yazılır. Bu yüzden ekip verisi tek kaynaktan (NVS) geliyor.
+    blocks: ["mudurluk", "skip", "amirlik", "skip"],
+    matchSignal: { cellText: "MÜDÜRLÜK BAZLI (ARISTO HARİÇ)" },
   },
 ];

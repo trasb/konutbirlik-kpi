@@ -7,7 +7,8 @@ import {
   isSeparateSheetsWorkbook,
   parseSeparateSheetsWorkbook,
 } from "@/lib/parsing/generic-separate-sheets";
-import { SEPARATE_SHEETS_FAMILIES } from "@/lib/parsing/family-specs";
+import { isMultiBlockWorkbook, parseMultiBlockWorkbook } from "@/lib/parsing/generic-multi-block";
+import { MULTI_BLOCK_FAMILIES, SEPARATE_SHEETS_FAMILIES } from "@/lib/parsing/family-specs";
 import type { ParseResult } from "@/lib/parsing/types";
 
 type Status =
@@ -39,17 +40,28 @@ export default function UploadPage() {
         return;
       }
 
-      const matches = SEPARATE_SHEETS_FAMILIES.filter((spec) => isSeparateSheetsWorkbook(wb, spec));
-      if (matches.length === 1) {
-        const spec = matches[0];
-        const result = parseSeparateSheetsWorkbook(wb, spec, file.name, period);
-        setStatus({ kind: "parsed", result, fileName: file.name, familyId: spec.id });
+      const separateMatches = SEPARATE_SHEETS_FAMILIES.filter((spec) =>
+        isSeparateSheetsWorkbook(wb, spec),
+      );
+      const multiBlockMatches = MULTI_BLOCK_FAMILIES.filter((spec) => isMultiBlockWorkbook(wb, spec));
+      const totalMatches = separateMatches.length + multiBlockMatches.length;
+
+      if (totalMatches === 1) {
+        if (separateMatches.length === 1) {
+          const spec = separateMatches[0];
+          const result = parseSeparateSheetsWorkbook(wb, spec, file.name, period);
+          setStatus({ kind: "parsed", result, fileName: file.name, familyId: spec.id });
+        } else {
+          const spec = multiBlockMatches[0];
+          const result = parseMultiBlockWorkbook(wb, spec, file.name, period);
+          setStatus({ kind: "parsed", result, fileName: file.name, familyId: spec.id });
+        }
         return;
       }
-      if (matches.length > 1) {
+      if (totalMatches > 1) {
         setStatus({
           kind: "error",
-          message: `Dosya birden fazla rapor tipiyle eşleşti (${matches.map((m) => m.id).join(", ")}), bu beklenmiyordu — lütfen bildir.`,
+          message: `Dosya birden fazla rapor tipiyle eşleşti (${[...separateMatches, ...multiBlockMatches].map((m) => m.id).join(", ")}), bu beklenmiyordu — lütfen bildir.`,
         });
         return;
       }
@@ -57,7 +69,7 @@ export default function UploadPage() {
       setStatus({
         kind: "error",
         message:
-          "Bu dosya tanınan bir rapor ailesine uymuyor. Desteklenen dosyalar: Net Verimlilik Skoru (NVS), İnternet Arıza Randevuya Uyum, T19/T99 Randevuya Uyum, T27/T30 Kurulum Tamamlanma, T41/T43 Port Testi, T4/T5/T7/T70/T29 Kurulum Süre Uyum, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza.",
+          "Bu dosya tanınan bir rapor ailesine uymuyor. Desteklenen dosyalar: NVS, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm Tamamlanma, T25 Kurulum Tamamlanma (detay), T33 Tekrar Eden Arıza (detay).",
       });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -89,7 +101,9 @@ export default function UploadPage() {
       <h1 className="text-xl font-semibold text-slate-900">Excel Yükle</h1>
       <p className="text-sm text-slate-500">
         Desteklenen dosyalar: NVS, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43,
-        T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza.
+        T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza, T34 IPTV
+        Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm Tamamlanma, T25/T33 (detaylı amirlik
+        kırılımı).
       </p>
 
       <div>

@@ -74,11 +74,18 @@ export async function POST(req: NextRequest) {
           kpiMonthlyFacts.amirlik,
           kpiMonthlyFacts.ekipNo,
         ],
+        // Aynı KPI hem NVS (sadece oran, ham sayı yok) hem de ayrı bir detay dosyasından
+        // (Pay/Payda dahil) gelebiliyor — ikisinin hesabı birebir aynı olmuyor. Hangisi
+        // sonra yüklenirse yüklensin, Pay/Payda içeren "zengin" veri her zaman kazanır;
+        // ham sayısız (oran-only) bir yükleme var olan zengin veriyi silmez. Bu olmadan,
+        // örn. T25 detay dosyasından sonra NVS yüklenirse, NVS'in ham sayısı olmayan kendi
+        // oranı, T25'in gerçek Pay/Payda'sını silip "hedefe ulaşmak için kaç iş lazım"
+        // hesabını bozardı.
         set: {
-          numerator: sql`excluded.numerator`,
-          denominator: sql`excluded.denominator`,
-          oran: sql`excluded.oran`,
-          sourceFile: sql`excluded.source_file`,
+          numerator: sql`CASE WHEN excluded.numerator IS NOT NULL OR kpi_monthly_facts.numerator IS NULL THEN excluded.numerator ELSE kpi_monthly_facts.numerator END`,
+          denominator: sql`CASE WHEN excluded.numerator IS NOT NULL OR kpi_monthly_facts.numerator IS NULL THEN excluded.denominator ELSE kpi_monthly_facts.denominator END`,
+          oran: sql`CASE WHEN excluded.numerator IS NOT NULL OR kpi_monthly_facts.numerator IS NULL THEN excluded.oran ELSE kpi_monthly_facts.oran END`,
+          sourceFile: sql`CASE WHEN excluded.numerator IS NOT NULL OR kpi_monthly_facts.numerator IS NULL THEN excluded.source_file ELSE kpi_monthly_facts.source_file END`,
           uploadedAt: sql`now()`,
         },
       });
