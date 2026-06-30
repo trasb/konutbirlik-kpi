@@ -100,6 +100,23 @@ export const gidisatMudurlukScores = pgTable(
   (t) => [uniqueIndex("gidisat_mudurluk_scores_unique").on(t.period, t.mudurluk)],
 );
 
+// "GidişaTT - Amirlik" dosyasından gelen amirlik bazlı ~20 KPI değeri (Pay/Payda yok, sadece
+// oran). Aynı veriler kpi_monthly_facts'e de yazılıyor (dashboard kartları için); bu tablo
+// dosyanın kendi bütünlüğünü ayrı bir ekranda gösterebilmek için ayrıca tutuluyor.
+export const gidisatAmirlikScores = pgTable(
+  "gidisat_amirlik_scores",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    period: text("period").notNull(),
+    mudurluk: text("mudurluk").notNull(),
+    amirlik: text("amirlik").notNull(),
+    // { "<kpi_code>": <oran> }
+    kpiValues: jsonb("kpi_values").notNull().default({}),
+    uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("gidisat_amirlik_scores_unique").on(t.period, t.mudurluk, t.amirlik)],
+);
+
 // Ham işemri/sipariş kayıtları — SADECE KONUTBİRLİK SAHA AMİRLİĞİ için tutuluyor (bilinçli
 // kapsam daraltma: diğer amirliklerin ham detayına ihtiyacımız yok, hacmi küçük tutar).
 // Süre dağılımı / "kaç tanesi geç kaldı, ne kadar geç kaldı" gibi analizlerin kaynağı.

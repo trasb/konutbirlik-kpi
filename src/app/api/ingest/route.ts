@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
+  gidisatAmirlikScores,
   gidisatMudurlukScores,
   kpiDefinitions,
   kpiMonthlyFacts,
@@ -10,13 +11,14 @@ import {
 import { eq, sql } from "drizzle-orm";
 import type { FactRow, NvsRow } from "@/lib/parsing/types";
 import type { GidisatRow } from "@/lib/parsing/gidisat";
-import type { GoldTarget } from "@/lib/parsing/gidisat-amirlik";
+import type { GidisatAmirlikRow, GoldTarget } from "@/lib/parsing/gidisat-amirlik";
 import type { RawIsKaydi } from "@/lib/parsing/raw-hamdata";
 
 type IngestPayload = {
   facts: FactRow[];
   nvsRows: NvsRow[];
   gidisatRows?: GidisatRow[];
+  gidisatAmirlikRows?: GidisatAmirlikRow[];
   goldTargets?: GoldTarget[];
   rawRecords?: RawIsKaydi[];
 };
@@ -176,6 +178,32 @@ export async function POST(req: NextRequest) {
     gidisatWritten += batch.length;
   }
 
+  const gidisatAmirlikRows = dedupeByKey(
+    Array.isArray(payload.gidisatAmirlikRows) ? payload.gidisatAmirlikRows : [],
+    (r) => [r.period, r.mudurluk, r.amirlik].join("|"),
+  );
+  let gidisatAmirlikWritten = 0;
+  for (const batch of chunk(gidisatAmirlikRows, CHUNK_SIZE)) {
+    await db
+      .insert(gidisatAmirlikScores)
+      .values(
+        batch.map((r) => ({
+          period: r.period,
+          mudurluk: r.mudurluk,
+          amirlik: r.amirlik,
+          kpiValues: r.kpiValues,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [gidisatAmirlikScores.period, gidisatAmirlikScores.mudurluk, gidisatAmirlikScores.amirlik],
+        set: {
+          kpiValues: sql`excluded.kpi_values`,
+          uploadedAt: sql`now()`,
+        },
+      });
+    gidisatAmirlikWritten += batch.length;
+  }
+
   const rawRecords = dedupeByKey(
     Array.isArray(payload.rawRecords) ? payload.rawRecords : [],
     (r) => [r.period, r.kpiCode, r.kayitNo].join("|"),
@@ -231,6 +259,7 @@ export async function POST(req: NextRequest) {
     factsWritten,
     nvsWritten,
     gidisatWritten,
+    gidisatAmirlikWritten,
     goldTargetsUpdated,
     rawRecordsWritten,
   });

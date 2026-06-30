@@ -13,7 +13,10 @@ export function Nav() {
         NVS
       </Link>
       <Link href="/gidisat" className="text-slate-600 hover:text-slate-900">
-        GidişaTT
+        GidişaTT Müdürlük
+      </Link>
+      <Link href="/gidisat-amirlik" className="text-slate-600 hover:text-slate-900">
+        GidişaTT Amirlik
       </Link>
       <Link href="/upload" className="text-slate-600 hover:text-slate-900">
         Excel Yükle

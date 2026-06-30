@@ -34,7 +34,17 @@ const DATA_START_ROW = 7;
 
 export type GoldTarget = { kpiCode: string; target: number };
 
-export type GidisatAmirlikParseResult = ParseResult & { goldTargets: GoldTarget[] };
+export type GidisatAmirlikRow = {
+  period: string;
+  mudurluk: string;
+  amirlik: string;
+  kpiValues: Record<string, number>;
+};
+
+export type GidisatAmirlikParseResult = ParseResult & {
+  goldTargets: GoldTarget[];
+  amirlikRows: GidisatAmirlikRow[];
+};
 
 function sheetToRows(workbook: XLSX.WorkBook): unknown[][] {
   const sheet = workbook.Sheets["Amirlik"];
@@ -68,6 +78,7 @@ export function parseGidisatAmirlikWorkbook(
 ): GidisatAmirlikParseResult {
   const warnings: string[] = [];
   const facts: FactRow[] = [];
+  const amirlikRows: GidisatAmirlikRow[] = [];
   const rows = sheetToRows(workbook);
 
   const altinRow = rows[ALTIN_ROW_INDEX] ?? [];
@@ -87,10 +98,12 @@ export function parseGidisatAmirlikWorkbook(
     if (amirlikRaw.toLocaleUpperCase("tr-TR") === "AMİRLİK") continue; // bölge özet satırı işaretçisi
 
     const mudurluk = normalizeMudurluk(mudurlukRaw);
+    const kpiValues: Record<string, number> = {};
 
     for (const { col, kpiCode } of COLUMN_MAP) {
       const oran = toNumber(row[col]);
       if (oran === null) continue;
+      kpiValues[kpiCode] = oran;
       facts.push({
         period,
         kpiCode,
@@ -104,7 +117,11 @@ export function parseGidisatAmirlikWorkbook(
         sourceFile,
       });
     }
+
+    if (Object.keys(kpiValues).length > 0) {
+      amirlikRows.push({ period, mudurluk, amirlik: amirlikRaw, kpiValues });
+    }
   }
 
-  return { facts, nvsRows: [], warnings, goldTargets };
+  return { facts, nvsRows: [], warnings, goldTargets, amirlikRows };
 }

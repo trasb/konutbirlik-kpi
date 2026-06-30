@@ -12,6 +12,7 @@ import { isGidisatWorkbook, parseGidisatWorkbook, type GidisatRow } from "@/lib/
 import {
   isGidisatAmirlikWorkbook,
   parseGidisatAmirlikWorkbook,
+  type GidisatAmirlikRow,
   type GoldTarget,
 } from "@/lib/parsing/gidisat-amirlik";
 import {
@@ -27,6 +28,7 @@ type Parsed = {
   facts: FactRow[];
   nvsRows: NvsRow[];
   gidisatRows: GidisatRow[];
+  gidisatAmirlikRows: GidisatAmirlikRow[];
   goldTargets: GoldTarget[];
   rawRecords: RawIsKaydi[];
   warnings: string[];
@@ -42,6 +44,7 @@ type Status =
       factsWritten: number;
       nvsWritten: number;
       gidisatWritten: number;
+      gidisatAmirlikWritten: number;
       goldTargetsUpdated: number;
       rawRecordsWritten: number;
     }
@@ -66,7 +69,7 @@ export default function UploadPage() {
         const r = parseNvsWorkbook(wb, file.name);
         setStatus({
           kind: "parsed",
-          result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], goldTargets: [], rawRecords: [], warnings: r.warnings },
+          result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], gidisatAmirlikRows: [], goldTargets: [], rawRecords: [], warnings: r.warnings },
           fileName: file.name,
           familyId: "NVS",
         });
@@ -77,7 +80,7 @@ export default function UploadPage() {
         const r = parseGidisatWorkbook(wb, period);
         setStatus({
           kind: "parsed",
-          result: { facts: [], nvsRows: [], gidisatRows: r.rows, goldTargets: [], rawRecords: [], warnings: r.warnings },
+          result: { facts: [], nvsRows: [], gidisatRows: r.rows, gidisatAmirlikRows: [], goldTargets: [], rawRecords: [], warnings: r.warnings },
           fileName: file.name,
           familyId: "GIDISAT",
         });
@@ -92,6 +95,7 @@ export default function UploadPage() {
             facts: r.facts,
             nvsRows: [],
             gidisatRows: [],
+            gidisatAmirlikRows: r.amirlikRows,
             goldTargets: r.goldTargets,
             rawRecords: [],
             warnings: r.warnings,
@@ -126,6 +130,7 @@ export default function UploadPage() {
               facts: r.facts,
               nvsRows: r.nvsRows,
               gidisatRows: [],
+              gidisatAmirlikRows: [],
               goldTargets: [],
               rawRecords,
               warnings: r.warnings,
@@ -138,7 +143,7 @@ export default function UploadPage() {
           const r = parseMultiBlockWorkbook(wb, spec, file.name, period);
           setStatus({
             kind: "parsed",
-            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], goldTargets: [], rawRecords: [], warnings: r.warnings },
+            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], gidisatAmirlikRows: [], goldTargets: [], rawRecords: [], warnings: r.warnings },
             fileName: file.name,
             familyId: spec.id,
           });
@@ -174,6 +179,7 @@ export default function UploadPage() {
           facts: status.result.facts,
           nvsRows: status.result.nvsRows,
           gidisatRows: status.result.gidisatRows,
+          gidisatAmirlikRows: status.result.gidisatAmirlikRows,
           goldTargets: status.result.goldTargets,
           rawRecords: status.result.rawRecords,
         }),
@@ -188,6 +194,7 @@ export default function UploadPage() {
         factsWritten: data.factsWritten,
         nvsWritten: data.nvsWritten,
         gidisatWritten: data.gidisatWritten ?? 0,
+        gidisatAmirlikWritten: data.gidisatAmirlikWritten ?? 0,
         goldTargetsUpdated: data.goldTargetsUpdated ?? 0,
         rawRecordsWritten: data.rawRecordsWritten ?? 0,
       });
@@ -240,6 +247,9 @@ export default function UploadPage() {
             <li>{status.result.facts.length} KPI fact satırı</li>
             <li>{status.result.nvsRows.length} NVS scorecard satırı</li>
             <li>{status.result.gidisatRows.length} GidişaTT müdürlük satırı</li>
+            {status.result.gidisatAmirlikRows.length > 0 && (
+              <li>{status.result.gidisatAmirlikRows.length} GidişaTT amirlik satırı</li>
+            )}
             {status.result.rawRecords.length > 0 && (
               <li>{status.result.rawRecords.length} ham iş kaydı (KONUTBİRLİK)</li>
             )}
@@ -270,6 +280,7 @@ export default function UploadPage() {
         <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
           Kaydedildi: {status.factsWritten} fact, {status.nvsWritten} NVS satırı,{" "}
           {status.gidisatWritten} GidişaTT satırı
+          {status.gidisatAmirlikWritten > 0 && `, ${status.gidisatAmirlikWritten} GidişaTT amirlik satırı`}
           {status.goldTargetsUpdated > 0 && `, ${status.goldTargetsUpdated} Altın hedef güncellendi`}
           {status.rawRecordsWritten > 0 && `, ${status.rawRecordsWritten} ham iş kaydı`}.
         </p>
