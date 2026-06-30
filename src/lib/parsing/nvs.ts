@@ -6,6 +6,7 @@ import {
   NvsLevel,
   ParseResult,
   fractionToPercent,
+  normalizeMudurluk,
   toNumber,
   toText,
 } from "./types";
@@ -96,7 +97,7 @@ function parseScoreOnlySheet(
     nvsRows.push({
       period,
       level,
-      mudurluk: mudurlukCol >= 0 ? (toText(row[mudurlukCol]) ?? "") : "",
+      mudurluk: mudurlukCol >= 0 ? normalizeMudurluk(row[mudurlukCol]) : "",
       amirlik: amirlikCol >= 0 ? (toText(row[amirlikCol]) ?? "") : "",
       ekipNo: "",
       ekipFirmaTipi: null,
@@ -149,7 +150,7 @@ function parseEkipOzet(
       continue;
     }
 
-    const mudurluk = toText(row[mudurlukCol]);
+    const mudurluk = normalizeMudurluk(row[mudurlukCol]);
     const amirlik = toText(row[amirlikCol]);
     const ekipNo = toText(row[ekipNoCol]);
     if (!mudurluk || !ekipNo) {

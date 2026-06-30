@@ -62,3 +62,16 @@ export function fractionToPercent(value: unknown): number | null {
   if (n === null) return null;
   return n <= 1 ? n * 100 : n;
 }
+
+/**
+ * Müdürlük adını dosyalar arası tutarlı bir anahtara indirger. Aynı müdürlük farklı
+ * dosyalarda farklı yazılıyor (NVS: "İKİTELLİ TELEKOM MÜDÜRLÜĞÜ (TİP-1)", çoğu T-dosyası:
+ * "İKİTELLİ") — bu fark normalize edilmezse upsert'in unique anahtarı farklı satırlar
+ * üretir ve dashboard sorguları amirlik verisini bulamaz. İlk kelimeyi (il/ilçe adı) alıp
+ * geri kalan "TELEKOM MÜDÜRLÜĞÜ (TİP-x)" gibi ekleri atıyoruz.
+ */
+export function normalizeMudurluk(value: unknown): string {
+  const s = toText(value);
+  if (!s) return "";
+  return s.split(" ")[0].toLocaleUpperCase("tr-TR");
+}

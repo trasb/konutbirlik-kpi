@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { FactRow, Level, ParseResult, toNumber, toText } from "./types";
+import { FactRow, Level, ParseResult, normalizeMudurluk, toNumber, toText } from "./types";
 
 export type MetricSpec = { kpiCode: string };
 
@@ -121,7 +121,7 @@ export function parseSeparateSheetsWorkbook(
       const row = rows[r];
       if (!row || row.every((c) => c === null)) continue;
 
-      const mudurluk = toText(row[mudurlukCol]);
+      const mudurluk = normalizeMudurluk(row[mudurlukCol]);
       if (!mudurluk) continue;
       const amirlik = amirlikCol >= 0 ? (toText(row[amirlikCol]) ?? "") : "";
       const ekipNo = ekipCol >= 0 ? (toText(row[ekipCol]) ?? "") : "";
