@@ -63,7 +63,7 @@ export default function UploadPage() {
     setStatus({ kind: "parsing" });
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
 
       if (isNvsWorkbook(wb)) {
         const r = parseNvsWorkbook(wb, file.name);
@@ -106,6 +106,81 @@ export default function UploadPage() {
         return;
       }
 
+      // T32 (Ev İçi Destek Arıza Tekrar) ve T36/T28 (Erken Arıza) standalone dosyalarının özet
+      // sayfaları için bir parser yazmadık (formül belirsizliği / öncelik), ama ham Hamdata
+      // sayfaları net olduğu için sadece ham kayıt çekiyoruz.
+      const sheetNames = wb.SheetNames;
+      if (
+        sheetNames.includes("TM") &&
+        sheetNames.includes("Amirlik") &&
+        sheetNames.includes("Ekip") &&
+        sheetNames.includes("Ham Data")
+      ) {
+        const { records } = parseRawHamdata(
+          wb,
+          {
+            sheetName: "Ham Data",
+            kpiCode: "T32_EV_ICI_TEKRAR",
+            mode: "numericThreshold",
+            valueHeaders: ["Tekrar Eden Arıza 7 Gün (Elitt Tekrar Eden)"],
+            threshold: 0,
+            comparison: "lte",
+          },
+          file.name,
+          period,
+          DEFAULT_AMIRLIK,
+        );
+        setStatus({
+          kind: "parsed",
+          result: {
+            facts: [],
+            nvsRows: [],
+            gidisatRows: [],
+            gidisatAmirlikRows: [],
+            goldTargets: [],
+            rawRecords: records,
+            warnings: [],
+          },
+          fileName: file.name,
+          familyId: "T32_RAW",
+        });
+        return;
+      }
+
+      if (
+        sheetNames.includes("Hamveri") &&
+        sheetNames.includes("Hamveri son 7 gün") &&
+        sheetNames.includes("T28-Dönüşüm Erken Arıza")
+      ) {
+        const { records } = parseRawHamdata(
+          wb,
+          {
+            sheetName: "Hamveri",
+            kpiCode: "T36_ERKEN_ARIZA",
+            mode: "nullMeansSuccess",
+            valueHeaders: ["İlk Arıza Zamanı"],
+          },
+          file.name,
+          period,
+          DEFAULT_AMIRLIK,
+        );
+        setStatus({
+          kind: "parsed",
+          result: {
+            facts: [],
+            nvsRows: [],
+            gidisatRows: [],
+            gidisatAmirlikRows: [],
+            goldTargets: [],
+            rawRecords: records,
+            warnings: [],
+          },
+          fileName: file.name,
+          familyId: "T36_28_RAW",
+        });
+        return;
+      }
+
       const separateMatches = SEPARATE_SHEETS_FAMILIES.filter((spec) =>
         isSeparateSheetsWorkbook(wb, spec),
       );
@@ -141,9 +216,23 @@ export default function UploadPage() {
         } else {
           const spec = multiBlockMatches[0];
           const r = parseMultiBlockWorkbook(wb, spec, file.name, period);
+
+          const rawSpecs = RAW_HAMDATA_BY_FAMILY[spec.id] ?? [];
+          const rawRecords = rawSpecs.flatMap(
+            (rawSpec) => parseRawHamdata(wb, rawSpec, file.name, period, DEFAULT_AMIRLIK).records,
+          );
+
           setStatus({
             kind: "parsed",
-            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], gidisatAmirlikRows: [], goldTargets: [], rawRecords: [], warnings: r.warnings },
+            result: {
+              facts: r.facts,
+              nvsRows: r.nvsRows,
+              gidisatRows: [],
+              gidisatAmirlikRows: [],
+              goldTargets: [],
+              rawRecords,
+              warnings: r.warnings,
+            },
             fileName: file.name,
             familyId: spec.id,
           });
