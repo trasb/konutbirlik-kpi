@@ -9,6 +9,12 @@ export function Nav() {
       <Link href="/" className="text-slate-600 hover:text-slate-900">
         Dashboard
       </Link>
+      <Link href="/nvs" className="text-slate-600 hover:text-slate-900">
+        NVS
+      </Link>
+      <Link href="/gidisat" className="text-slate-600 hover:text-slate-900">
+        GidişaTT
+      </Link>
       <Link href="/upload" className="text-slate-600 hover:text-slate-900">
         Excel Yükle
       </Link>

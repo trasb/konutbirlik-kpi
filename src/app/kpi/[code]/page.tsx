@@ -21,6 +21,17 @@ function fmt(n: number | null, digits = 1): string {
   return n.toLocaleString("tr-TR", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 }
 
+/** index=0 (en başarılı) yeşil, index=total-1 (en başarısız) kırmızı olacak şekilde gradyan üretir. */
+function rankColor(index: number, total: number): { backgroundColor: string; color: string } {
+  if (total <= 1) return { backgroundColor: "hsl(80 70% 94%)", color: "hsl(80 70% 25%)" };
+  const t = index / (total - 1); // 0..1
+  const hue = 120 * (1 - t); // 120=yeşil, 0=kırmızı
+  return {
+    backgroundColor: `hsl(${hue} 70% 94%)`,
+    color: `hsl(${hue} 70% 25%)`,
+  };
+}
+
 export default async function KpiDetailPage({
   params,
   searchParams,
@@ -103,17 +114,33 @@ export default async function KpiDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {sortedEkip.map((e) => (
-                  <tr key={e.ekipNo} className="border-b border-slate-100">
-                    <td className="py-1.5 pr-4 font-mono text-xs">{e.ekipNo}</td>
-                    <td className="py-1.5 pr-4">{e.oran === null ? "—" : `${fmt(e.oran)}%`}</td>
-                    <td className="py-1.5 pr-4 text-slate-400">
-                      {e.numerator === null || e.denominator === null
-                        ? "—"
-                        : `${fmt(e.numerator, 0)} / ${fmt(e.denominator, 0)}`}
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const withData = sortedEkip.filter((e) => e.oran !== null);
+                  let rankIdx = -1;
+                  return sortedEkip.map((e) => {
+                    const hasData = e.oran !== null;
+                    if (hasData) rankIdx++;
+                    const colors = hasData ? rankColor(rankIdx, withData.length) : undefined;
+                    return (
+                      <tr key={e.ekipNo} className="border-b border-slate-100">
+                        <td className="py-1.5 pr-4 font-mono text-xs">{e.ekipNo}</td>
+                        <td className="py-1.5 pr-4">
+                          <span
+                            className={colors ? "rounded px-2 py-0.5 font-medium" : ""}
+                            style={colors}
+                          >
+                            {e.oran === null ? "—" : `${fmt(e.oran)}%`}
+                          </span>
+                        </td>
+                        <td className="py-1.5 pr-4 text-slate-400">
+                          {e.numerator === null || e.denominator === null
+                            ? "—"
+                            : `${fmt(e.numerator, 0)} / ${fmt(e.denominator, 0)}`}
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           )}

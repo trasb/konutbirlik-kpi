@@ -15,6 +15,13 @@
       "when": 1782812173548,
       "tag": "0001_illegal_reptil",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782819495918,
+      "tag": "0002_many_sandman",
+      "breakpoints": true
     }
   ]
 }

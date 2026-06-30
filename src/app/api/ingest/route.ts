@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { kpiMonthlyFacts, nvsMonthlyScores } from "@/db/schema";
+import { gidisatMudurlukScores, kpiMonthlyFacts, nvsMonthlyScores } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import type { FactRow, NvsRow } from "@/lib/parsing/types";
+import type { GidisatRow } from "@/lib/parsing/gidisat";
 
 type IngestPayload = {
   facts: FactRow[];
   nvsRows: NvsRow[];
+  gidisatRows?: GidisatRow[];
 };
 
 const CHUNK_SIZE = 500;
@@ -42,9 +44,13 @@ export async function POST(req: NextRequest) {
   const nvsRows = dedupeByKey(Array.isArray(payload.nvsRows) ? payload.nvsRows : [], (r) =>
     [r.period, r.level, r.mudurluk, r.amirlik, r.ekipNo].join("|"),
   );
+  const gidisatRows = dedupeByKey(
+    Array.isArray(payload.gidisatRows) ? payload.gidisatRows : [],
+    (r) => [r.period, r.mudurluk].join("|"),
+  );
 
-  if (facts.length === 0 && nvsRows.length === 0) {
-    return NextResponse.json({ error: "facts veya nvsRows boş olamaz" }, { status: 400 });
+  if (facts.length === 0 && nvsRows.length === 0 && gidisatRows.length === 0) {
+    return NextResponse.json({ error: "facts, nvsRows veya gidisatRows boş olamaz" }, { status: 400 });
   }
 
   let factsWritten = 0;
@@ -126,5 +132,30 @@ export async function POST(req: NextRequest) {
     nvsWritten += batch.length;
   }
 
-  return NextResponse.json({ factsWritten, nvsWritten });
+  let gidisatWritten = 0;
+  for (const batch of chunk(gidisatRows, CHUNK_SIZE)) {
+    await db
+      .insert(gidisatMudurlukScores)
+      .values(
+        batch.map((r) => ({
+          period: r.period,
+          mudurluk: r.mudurluk,
+          sira: r.sira,
+          skor: r.skor === null ? null : String(r.skor),
+          kpiValues: r.kpiValues,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [gidisatMudurlukScores.period, gidisatMudurlukScores.mudurluk],
+        set: {
+          sira: sql`excluded.sira`,
+          skor: sql`excluded.skor`,
+          kpiValues: sql`excluded.kpi_values`,
+          uploadedAt: sql`now()`,
+        },
+      });
+    gidisatWritten += batch.length;
+  }
+
+  return NextResponse.json({ factsWritten, nvsWritten, gidisatWritten });
 }

@@ -188,6 +188,48 @@ export async function getKpiEkipTable(
   }));
 }
 
+export type NvsComponentRow = {
+  kpiCode: string;
+  name: string;
+  oran: number | null;
+  skor: number | null;
+};
+
+export async function getNvsComponents(
+  mudurluk: string,
+  amirlik: string,
+  period: string,
+): Promise<{ toplamPuan: number | null; components: NvsComponentRow[] }> {
+  const [scoreRows, defs] = await Promise.all([
+    db
+      .select()
+      .from(nvsMonthlyScores)
+      .where(
+        and(
+          eq(nvsMonthlyScores.level, "amirlik"),
+          eq(nvsMonthlyScores.mudurluk, mudurluk),
+          eq(nvsMonthlyScores.amirlik, amirlik),
+          eq(nvsMonthlyScores.period, period),
+        ),
+      ),
+    db.select().from(kpiDefinitions),
+  ]);
+
+  const score = scoreRows[0];
+  if (!score) return { toplamPuan: null, components: [] };
+
+  const nameByCode = new Map(defs.map((d) => [d.kpiCode, d.name]));
+  const raw = score.components as Record<string, { oran: number | null; skor: number | null }>;
+  const components = Object.entries(raw).map(([kpiCode, v]) => ({
+    kpiCode,
+    name: nameByCode.get(kpiCode) ?? kpiCode,
+    oran: v.oran,
+    skor: v.skor,
+  }));
+
+  return { toplamPuan: num(score.toplamPuan), components };
+}
+
 export async function getAllKpiDefinitionsWithGoals() {
   const [defs, goalRows] = await Promise.all([
     db.select().from(kpiDefinitions).orderBy(kpiDefinitions.sourceFamily, kpiDefinitions.kpiCode),

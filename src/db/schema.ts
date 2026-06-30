@@ -83,6 +83,23 @@ export const nvsMonthlyScores = pgTable(
   ],
 );
 
+// "GidişaTT Ara Bilgilendirme" dosyasından gelen, MÜDÜRLÜK seviyesinde bölge-içi sıralama/skor
+// (amirlik/ekip kırılımı yok — bu rapor müdürlükleri birbiriyle kıyaslıyor).
+export const gidisatMudurlukScores = pgTable(
+  "gidisat_mudurluk_scores",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    period: text("period").notNull(),
+    mudurluk: text("mudurluk").notNull(),
+    sira: integer("sira"),
+    skor: numeric("skor", { precision: 10, scale: 4 }),
+    // Hamdata sayfasındaki ham KPI değerleri: { "<kolon başlığı>": <değer> }
+    kpiValues: jsonb("kpi_values").notNull().default({}),
+    uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("gidisat_mudurluk_scores_unique").on(t.period, t.mudurluk)],
+);
+
 // Kullanıcının her KPI için belirlediği özel hedef (varsayılan: kpiDefinitions.targetGold).
 export const goals = pgTable("goals", {
   kpiCode: text("kpi_code")

@@ -8,15 +8,23 @@ import {
   parseSeparateSheetsWorkbook,
 } from "@/lib/parsing/generic-separate-sheets";
 import { isMultiBlockWorkbook, parseMultiBlockWorkbook } from "@/lib/parsing/generic-multi-block";
+import { isGidisatWorkbook, parseGidisatWorkbook, type GidisatRow } from "@/lib/parsing/gidisat";
 import { MULTI_BLOCK_FAMILIES, SEPARATE_SHEETS_FAMILIES } from "@/lib/parsing/family-specs";
-import type { ParseResult } from "@/lib/parsing/types";
+import type { FactRow, NvsRow } from "@/lib/parsing/types";
+
+type Parsed = {
+  facts: FactRow[];
+  nvsRows: NvsRow[];
+  gidisatRows: GidisatRow[];
+  warnings: string[];
+};
 
 type Status =
   | { kind: "idle" }
   | { kind: "parsing" }
-  | { kind: "parsed"; result: ParseResult; fileName: string; familyId: string }
+  | { kind: "parsed"; result: Parsed; fileName: string; familyId: string }
   | { kind: "uploading" }
-  | { kind: "done"; factsWritten: number; nvsWritten: number }
+  | { kind: "done"; factsWritten: number; nvsWritten: number; gidisatWritten: number }
   | { kind: "error"; message: string };
 
 function defaultPeriod(): string {
@@ -35,8 +43,24 @@ export default function UploadPage() {
       const wb = XLSX.read(buf, { type: "array" });
 
       if (isNvsWorkbook(wb)) {
-        const result = parseNvsWorkbook(wb, file.name);
-        setStatus({ kind: "parsed", result, fileName: file.name, familyId: "NVS" });
+        const r = parseNvsWorkbook(wb, file.name);
+        setStatus({
+          kind: "parsed",
+          result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], warnings: r.warnings },
+          fileName: file.name,
+          familyId: "NVS",
+        });
+        return;
+      }
+
+      if (isGidisatWorkbook(wb)) {
+        const r = parseGidisatWorkbook(wb, period);
+        setStatus({
+          kind: "parsed",
+          result: { facts: [], nvsRows: [], gidisatRows: r.rows, warnings: r.warnings },
+          fileName: file.name,
+          familyId: "GIDISAT",
+        });
         return;
       }
 
@@ -49,12 +73,22 @@ export default function UploadPage() {
       if (totalMatches === 1) {
         if (separateMatches.length === 1) {
           const spec = separateMatches[0];
-          const result = parseSeparateSheetsWorkbook(wb, spec, file.name, period);
-          setStatus({ kind: "parsed", result, fileName: file.name, familyId: spec.id });
+          const r = parseSeparateSheetsWorkbook(wb, spec, file.name, period);
+          setStatus({
+            kind: "parsed",
+            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], warnings: r.warnings },
+            fileName: file.name,
+            familyId: spec.id,
+          });
         } else {
           const spec = multiBlockMatches[0];
-          const result = parseMultiBlockWorkbook(wb, spec, file.name, period);
-          setStatus({ kind: "parsed", result, fileName: file.name, familyId: spec.id });
+          const r = parseMultiBlockWorkbook(wb, spec, file.name, period);
+          setStatus({
+            kind: "parsed",
+            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], warnings: r.warnings },
+            fileName: file.name,
+            familyId: spec.id,
+          });
         }
         return;
       }
@@ -69,7 +103,7 @@ export default function UploadPage() {
       setStatus({
         kind: "error",
         message:
-          "Bu dosya tanınan bir rapor ailesine uymuyor. Desteklenen dosyalar: NVS, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm Tamamlanma, T25 Kurulum Tamamlanma (detay), T33 Tekrar Eden Arıza (detay).",
+          "Bu dosya tanınan bir rapor ailesine uymuyor. Desteklenen dosyalar: NVS, GidişaTT Ara Bilgilendirme, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm Tamamlanma, T25/T33 (detaylı amirlik kırılımı).",
       });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -83,14 +117,23 @@ export default function UploadPage() {
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facts: status.result.facts, nvsRows: status.result.nvsRows }),
+        body: JSON.stringify({
+          facts: status.result.facts,
+          nvsRows: status.result.nvsRows,
+          gidisatRows: status.result.gidisatRows,
+        }),
       });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Sunucu hatası: ${res.status} ${text}`);
       }
       const data = await res.json();
-      setStatus({ kind: "done", factsWritten: data.factsWritten, nvsWritten: data.nvsWritten });
+      setStatus({
+        kind: "done",
+        factsWritten: data.factsWritten,
+        nvsWritten: data.nvsWritten,
+        gidisatWritten: data.gidisatWritten ?? 0,
+      });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : String(err) });
     }
@@ -100,10 +143,10 @@ export default function UploadPage() {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-12">
       <h1 className="text-xl font-semibold text-slate-900">Excel Yükle</h1>
       <p className="text-sm text-slate-500">
-        Desteklenen dosyalar: NVS, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43,
-        T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza, T34 IPTV
-        Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm Tamamlanma, T25/T33 (detaylı amirlik
-        kırılımı).
+        Desteklenen dosyalar: NVS, GidişaTT Ara Bilgilendirme, İnternet Arıza Randevuya Uyum,
+        T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza,
+        Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm
+        Tamamlanma, T25/T33 (detaylı amirlik kırılımı).
       </p>
 
       <div>
@@ -139,6 +182,7 @@ export default function UploadPage() {
           <ul className="mt-2 list-disc pl-5 text-slate-600">
             <li>{status.result.facts.length} KPI fact satırı</li>
             <li>{status.result.nvsRows.length} NVS scorecard satırı</li>
+            <li>{status.result.gidisatRows.length} GidişaTT müdürlük satırı</li>
             <li>{status.result.warnings.length} uyarı</li>
           </ul>
           {status.result.warnings.length > 0 && (
@@ -164,7 +208,8 @@ export default function UploadPage() {
 
       {status.kind === "done" && (
         <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-          Kaydedildi: {status.factsWritten} fact, {status.nvsWritten} NVS satırı.
+          Kaydedildi: {status.factsWritten} fact, {status.nvsWritten} NVS satırı,{" "}
+          {status.gidisatWritten} GidişaTT satırı.
         </p>
       )}
 

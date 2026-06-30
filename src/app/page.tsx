@@ -6,7 +6,6 @@ import {
   DEFAULT_MUDURLUK,
   getKpiCards,
   getLatestPeriod,
-  getNvsTrend,
   listAmirlikler,
   listPeriods,
 } from "@/lib/data/dashboard";
@@ -55,10 +54,7 @@ export default async function Home({
 
   const period = sp.p ?? latestPeriod;
 
-  const [trend, cards] = await Promise.all([
-    getNvsTrend(mudurluk, amirlik),
-    getKpiCards(mudurluk, amirlik, period),
-  ]);
+  const cards = await getKpiCards(mudurluk, amirlik, period);
 
   const offTarget = cards.filter((c) => c.onTarget === false);
   const onTarget = cards.filter((c) => c.onTarget === true);
@@ -82,29 +78,16 @@ export default async function Home({
           <span className="text-sm text-slate-400">· {period}</span>
         </div>
 
-        {trend.length > 0 && (
-          <div className="mt-4 rounded-lg border border-slate-200 p-4">
-            <h2 className="mb-2 text-sm font-medium text-slate-700">
-              Net Verimlilik Skoru — Aylık Trend
-            </h2>
-            <div className="flex items-end gap-2 overflow-x-auto pb-2">
-              {trend.map((t) => {
-                const height = t.toplamPuan === null ? 4 : Math.max(4, (t.toplamPuan / 100) * 96);
-                return (
-                  <div key={t.period} className="flex flex-col items-center gap-1">
-                    <div className="text-xs text-slate-500">{fmt(t.toplamPuan)}</div>
-                    <div
-                      className="w-8 rounded-t bg-slate-800"
-                      style={{ height: `${height}px` }}
-                      title={`${t.period}: ${fmt(t.toplamPuan)}`}
-                    />
-                    <div className="text-xs text-slate-400">{t.period.slice(2)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <p className="mt-2 text-sm text-slate-500">
+          Net Verimlilik Skoru toplam puanı ve bileşen kırılımı için{" "}
+          <Link
+            href={`/nvs?ma=${encodeURIComponent(`${mudurluk}||${amirlik}`)}&p=${period}`}
+            className="text-slate-900 underline"
+          >
+            NVS sayfasına
+          </Link>{" "}
+          bak.
+        </p>
 
         <div className="mt-6 flex gap-4 text-sm">
           <span className="text-slate-500">
