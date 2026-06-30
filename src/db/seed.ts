@@ -74,11 +74,14 @@ async function main() {
       })
       .onConflictDoUpdate({
         target: kpiDefinitions.kpiCode,
+        // targetGold KASITLI OLARAK burada yok: Excel yüklemeleri (GidişaTT Amirlik, NVS)
+        // target_gold'u dinamik olarak güncelliyor. Seed tekrar çalıştığında bu öğrenilmiş
+        // değerleri sabit (çoğunlukla null) seed listesiyle ezerse, az önce yüklenen Altın
+        // hedefler kaybolur — bu gerçekten yaşandı ve fark edilmesi zor bir hataydı.
         set: {
           name: kpi.name,
           direction: kpi.direction,
           unit: kpi.unit ?? "percent",
-          targetGold: kpi.targetGold === null ? null : String(kpi.targetGold),
           sourceFamily: kpi.sourceFamily,
         },
       });

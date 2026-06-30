@@ -98,6 +98,12 @@ export async function listRawStatsPeriods(kpiCode: string): Promise<string[]> {
 
 const PENCERE_GUN = 30;
 
+// 30 günlük pencere/düşme projeksiyonu SADECE bu kapsamda anlamlı: bir olay oluştuğu tarihten
+// itibaren ~30 gün boyunca orana dahil kalıp sonra düşen "erken arıza" tipi KPI'lar. Diğer
+// KPI'larda (örn. kurulum tamamlanma, port testi) "uyumsuz" kaydın bir tarihi olması bu mantığı
+// uygulamayı haklı çıkarmaz — bu yüzden burada açık bir izin listesi tutuluyor.
+const PENCERE_30_GUN_KPI_CODES = new Set(["T36_ERKEN_ARIZA"]);
+
 export type ErkenArizaOlay = { tarih: string; ekipNo: string; kayitNo: string };
 export type DusmeNoktasi = {
   tarih: string; // o tarihte düşen olayların tarihi (YYYY-MM-DD)
@@ -125,6 +131,8 @@ export async function getErkenArizaPenceresi(
   period: string,
   pencereGun = PENCERE_GUN,
 ): Promise<ErkenArizaPenceresi | null> {
+  if (!PENCERE_30_GUN_KPI_CODES.has(kpiCode)) return null;
+
   const rows = await db
     .select()
     .from(rawIsKayitlari)
