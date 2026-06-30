@@ -1,5 +1,6 @@
 import { SeparateSheetsFamilySpec } from "./generic-separate-sheets";
 import { MultiBlockFamilySpec } from "./generic-multi-block";
+import { RawHamdataSpec } from "./raw-hamdata";
 
 export const SEPARATE_SHEETS_FAMILIES: SeparateSheetsFamilySpec[] = [
   {
@@ -132,3 +133,18 @@ export const MULTI_BLOCK_FAMILIES: MultiBlockFamilySpec[] = [
     matchSignal: { cellText: "MÜDÜRLÜK BAZLI (ARISTO HARİÇ)" },
   },
 ];
+
+/**
+ * Bazı Tip A dosya aileleri, özet sayfalarının yanında ham (işemri bazlı) bir Hamdata sayfası
+ * da içeriyor. Bu sayfalardan sadece KONUTBİRLİK'e ait satırlar çekilip süre dağılımı gibi
+ * detaylı analizler için saklanıyor (bkz. src/lib/parsing/raw-hamdata.ts).
+ */
+export const RAW_HAMDATA_BY_FAMILY: Record<string, RawHamdataSpec[]> = {
+  T4_5_7_70: [
+    {
+      sheetName: "T4-İnt. Kurulum Süre Uyum Hamda",
+      kpiCode: "T4_KURULUM_SURE_UYUM",
+      uyumluHeaders: ["Kurulum Süresine Uyum"],
+    },
+  ],
+};

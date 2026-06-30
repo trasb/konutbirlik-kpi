@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { gidisatMudurlukScores, kpiDefinitions, kpiMonthlyFacts, nvsMonthlyScores } from "@/db/schema";
+import {
+  gidisatMudurlukScores,
+  kpiDefinitions,
+  kpiMonthlyFacts,
+  nvsMonthlyScores,
+  rawIsKayitlari,
+} from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import type { FactRow, NvsRow } from "@/lib/parsing/types";
 import type { GidisatRow } from "@/lib/parsing/gidisat";
 import type { GoldTarget } from "@/lib/parsing/gidisat-amirlik";
+import type { RawIsKaydi } from "@/lib/parsing/raw-hamdata";
 
 type IngestPayload = {
   facts: FactRow[];
   nvsRows: NvsRow[];
   gidisatRows?: GidisatRow[];
   goldTargets?: GoldTarget[];
+  rawRecords?: RawIsKaydi[];
 };
 
 const CHUNK_SIZE = 500;
@@ -51,8 +59,17 @@ export async function POST(req: NextRequest) {
     (r) => [r.period, r.mudurluk].join("|"),
   );
 
-  if (facts.length === 0 && nvsRows.length === 0 && gidisatRows.length === 0) {
-    return NextResponse.json({ error: "facts, nvsRows veya gidisatRows boş olamaz" }, { status: 400 });
+  const rawRecordsPayload = Array.isArray(payload.rawRecords) ? payload.rawRecords : [];
+  if (
+    facts.length === 0 &&
+    nvsRows.length === 0 &&
+    gidisatRows.length === 0 &&
+    rawRecordsPayload.length === 0
+  ) {
+    return NextResponse.json(
+      { error: "facts, nvsRows, gidisatRows veya rawRecords boş olamaz" },
+      { status: 400 },
+    );
   }
 
   let factsWritten = 0;
@@ -159,6 +176,46 @@ export async function POST(req: NextRequest) {
     gidisatWritten += batch.length;
   }
 
+  const rawRecords = dedupeByKey(
+    Array.isArray(payload.rawRecords) ? payload.rawRecords : [],
+    (r) => [r.period, r.kpiCode, r.kayitNo].join("|"),
+  );
+  let rawRecordsWritten = 0;
+  for (const batch of chunk(rawRecords, CHUNK_SIZE)) {
+    await db
+      .insert(rawIsKayitlari)
+      .values(
+        batch.map((r) => ({
+          period: r.period,
+          kpiCode: r.kpiCode,
+          mudurluk: r.mudurluk,
+          amirlik: r.amirlik,
+          ekipNo: r.ekipNo,
+          kayitNo: r.kayitNo,
+          isTuru: r.isTuru,
+          sureSaat: r.sureSaat === null ? null : String(r.sureSaat),
+          uyumlu: r.uyumlu,
+          tamamlanmaTarihi: r.tamamlanmaTarihi ? new Date(r.tamamlanmaTarihi) : null,
+          sourceFile: r.sourceFile,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [rawIsKayitlari.period, rawIsKayitlari.kpiCode, rawIsKayitlari.kayitNo],
+        set: {
+          mudurluk: sql`excluded.mudurluk`,
+          amirlik: sql`excluded.amirlik`,
+          ekipNo: sql`excluded.ekip_no`,
+          isTuru: sql`excluded.is_turu`,
+          sureSaat: sql`excluded.sure_saat`,
+          uyumlu: sql`excluded.uyumlu`,
+          tamamlanmaTarihi: sql`excluded.tamamlanma_tarihi`,
+          sourceFile: sql`excluded.source_file`,
+          uploadedAt: sql`now()`,
+        },
+      });
+    rawRecordsWritten += batch.length;
+  }
+
   let goldTargetsUpdated = 0;
   const goldTargets = Array.isArray(payload.goldTargets) ? payload.goldTargets : [];
   for (const g of goldTargets) {
@@ -170,5 +227,11 @@ export async function POST(req: NextRequest) {
     goldTargetsUpdated += res.rowCount ?? 0;
   }
 
-  return NextResponse.json({ factsWritten, nvsWritten, gidisatWritten, goldTargetsUpdated });
+  return NextResponse.json({
+    factsWritten,
+    nvsWritten,
+    gidisatWritten,
+    goldTargetsUpdated,
+    rawRecordsWritten,
+  });
 }

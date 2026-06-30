@@ -10,6 +10,7 @@ import {
   getLatestPeriod,
 } from "@/lib/data/dashboard";
 import { rankColor } from "@/lib/colors";
+import { listRawStatsPeriods } from "@/lib/data/raw-stats";
 
 function parseMa(ma: string | undefined): { mudurluk: string; amirlik: string } {
   if (!ma || !ma.includes("||")) return { mudurluk: DEFAULT_MUDURLUK, amirlik: DEFAULT_AMIRLIK };
@@ -39,9 +40,10 @@ export default async function KpiDetailPage({
   const latestPeriod = sp.p ?? (await getLatestPeriod());
   if (!latestPeriod) notFound();
 
-  const [trend, ekipRows] = await Promise.all([
+  const [trend, ekipRows, rawPeriods] = await Promise.all([
     getKpiTrend(code, mudurluk, amirlik),
     getKpiEkipTable(code, mudurluk, amirlik, latestPeriod),
+    listRawStatsPeriods(code),
   ]);
 
   const sortedEkip = [...ekipRows].sort((a, b) => {
@@ -64,6 +66,14 @@ export default async function KpiDetailPage({
         <p className="text-sm text-slate-500">
           {amirlik} · {mudurluk} · {def.sourceFamily}
         </p>
+        {rawPeriods.length > 0 && (
+          <Link
+            href={`/surec/${code}?p=${rawPeriods.includes(latestPeriod) ? latestPeriod : rawPeriods[0]}`}
+            className="mt-2 inline-block text-sm text-slate-900 underline"
+          >
+            Süreç detayına bak (kaç tanesi süresinde, geç kalanlar ne kadar gecikti)
+          </Link>
+        )}
 
         {trend.length > 0 && (
           <div className="mt-6 rounded-lg border border-slate-200 p-4">

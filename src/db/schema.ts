@@ -100,6 +100,31 @@ export const gidisatMudurlukScores = pgTable(
   (t) => [uniqueIndex("gidisat_mudurluk_scores_unique").on(t.period, t.mudurluk)],
 );
 
+// Ham işemri/sipariş kayıtları — SADECE KONUTBİRLİK SAHA AMİRLİĞİ için tutuluyor (bilinçli
+// kapsam daraltma: diğer amirliklerin ham detayına ihtiyacımız yok, hacmi küçük tutar).
+// Süre dağılımı / "kaç tanesi geç kaldı, ne kadar geç kaldı" gibi analizlerin kaynağı.
+export const rawIsKayitlari = pgTable(
+  "raw_is_kayitlari",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    period: text("period").notNull(),
+    kpiCode: text("kpi_code")
+      .notNull()
+      .references(() => kpiDefinitions.kpiCode),
+    mudurluk: text("mudurluk").notNull(),
+    amirlik: text("amirlik").notNull(),
+    ekipNo: text("ekip_no").notNull().default(""),
+    kayitNo: text("kayit_no").notNull(), // kaynak dosyadaki benzersiz iş/sipariş kimliği
+    isTuru: text("is_turu"),
+    sureSaat: numeric("sure_saat", { precision: 10, scale: 2 }),
+    uyumlu: integer("uyumlu"), // 1=evet, 0=hayır, null=bilinmiyor (Postgres boolean yerine basit int)
+    tamamlanmaTarihi: timestamp("tamamlanma_tarihi"),
+    sourceFile: text("source_file"),
+    uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("raw_is_kayitlari_unique").on(t.period, t.kpiCode, t.kayitNo)],
+);
+
 // Kullanıcının her KPI için belirlediği özel hedef (varsayılan: kpiDefinitions.targetGold).
 export const goals = pgTable("goals", {
   kpiCode: text("kpi_code")

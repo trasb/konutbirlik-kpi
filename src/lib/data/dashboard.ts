@@ -2,8 +2,7 @@ import { db } from "@/db";
 import { kpiDefinitions, kpiMonthlyFacts, nvsMonthlyScores, goals } from "@/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
 
-export const DEFAULT_MUDURLUK = "İKİTELLİ";
-export const DEFAULT_AMIRLIK = "KONUTBİRLİK SAHA AMİRLİĞİ";
+export { DEFAULT_MUDURLUK, DEFAULT_AMIRLIK } from "@/lib/constants";
 
 function num(v: string | null): number | null {
   if (v === null) return null;
