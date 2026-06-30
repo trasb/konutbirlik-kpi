@@ -3,18 +3,29 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import { isNvsWorkbook, parseNvsWorkbook } from "@/lib/parsing/nvs";
+import {
+  isSeparateSheetsWorkbook,
+  parseSeparateSheetsWorkbook,
+} from "@/lib/parsing/generic-separate-sheets";
+import { SEPARATE_SHEETS_FAMILIES } from "@/lib/parsing/family-specs";
 import type { ParseResult } from "@/lib/parsing/types";
 
 type Status =
   | { kind: "idle" }
   | { kind: "parsing" }
-  | { kind: "parsed"; result: ParseResult; fileName: string }
+  | { kind: "parsed"; result: ParseResult; fileName: string; familyId: string }
   | { kind: "uploading" }
   | { kind: "done"; factsWritten: number; nvsWritten: number }
   | { kind: "error"; message: string };
 
+function defaultPeriod(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function UploadPage() {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [period, setPeriod] = useState(defaultPeriod());
 
   async function handleFile(file: File) {
     setStatus({ kind: "parsing" });
@@ -22,17 +33,32 @@ export default function UploadPage() {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
 
-      if (!isNvsWorkbook(wb)) {
+      if (isNvsWorkbook(wb)) {
+        const result = parseNvsWorkbook(wb, file.name);
+        setStatus({ kind: "parsed", result, fileName: file.name, familyId: "NVS" });
+        return;
+      }
+
+      const matches = SEPARATE_SHEETS_FAMILIES.filter((spec) => isSeparateSheetsWorkbook(wb, spec));
+      if (matches.length === 1) {
+        const spec = matches[0];
+        const result = parseSeparateSheetsWorkbook(wb, spec, file.name, period);
+        setStatus({ kind: "parsed", result, fileName: file.name, familyId: spec.id });
+        return;
+      }
+      if (matches.length > 1) {
         setStatus({
           kind: "error",
-          message:
-            "Bu dosya tanınan bir rapor ailesine uymuyor. Şu an sadece 'Net Verimlilik Skoru (NVS)' dosyası destekleniyor, diğer KPI dosyaları sırayla eklenecek.",
+          message: `Dosya birden fazla rapor tipiyle eşleşti (${matches.map((m) => m.id).join(", ")}), bu beklenmiyordu — lütfen bildir.`,
         });
         return;
       }
 
-      const result = parseNvsWorkbook(wb, file.name);
-      setStatus({ kind: "parsed", result, fileName: file.name });
+      setStatus({
+        kind: "error",
+        message:
+          "Bu dosya tanınan bir rapor ailesine uymuyor. Desteklenen dosyalar: Net Verimlilik Skoru (NVS), İnternet Arıza Randevuya Uyum, T19/T99 Randevuya Uyum, T27/T30 Kurulum Tamamlanma, T41/T43 Port Testi, T4/T5/T7/T70/T29 Kurulum Süre Uyum, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza.",
+      });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : String(err) });
     }
@@ -62,9 +88,22 @@ export default function UploadPage() {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-12">
       <h1 className="text-xl font-semibold text-slate-900">Excel Yükle</h1>
       <p className="text-sm text-slate-500">
-        Şu an sadece <code>Net Verimlilik Skoru (NVS).xlsx</code> dosyası destekleniyor. Diğer KPI
-        dosyaları (T4, T18, T25...) sırayla eklenecek.
+        Desteklenen dosyalar: NVS, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43,
+        T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza.
       </p>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="period">
+          Dönem (NVS ve T39 dışındaki dosyalar için kullanılır)
+        </label>
+        <input
+          id="period"
+          type="month"
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          className="rounded-md border border-slate-300 p-2 text-sm"
+        />
+      </div>
 
       <input
         type="file"
@@ -80,7 +119,9 @@ export default function UploadPage() {
 
       {status.kind === "parsed" && (
         <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
-          <p className="font-medium text-slate-800">{status.fileName}</p>
+          <p className="font-medium text-slate-800">
+            {status.fileName} <span className="text-slate-400">({status.familyId})</span>
+          </p>
           <ul className="mt-2 list-disc pl-5 text-slate-600">
             <li>{status.result.facts.length} KPI fact satırı</li>
             <li>{status.result.nvsRows.length} NVS scorecard satırı</li>
