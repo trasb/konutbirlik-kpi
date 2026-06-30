@@ -33,8 +33,11 @@ export const kpiMonthlyFacts = pgTable(
       .references(() => kpiDefinitions.kpiCode),
     level: levelEnum("level").notNull(),
     mudurluk: text("mudurluk").notNull(),
-    amirlik: text("amirlik"),
-    ekipNo: text("ekip_no"),
+    // Boş string ("") = "uygulanmıyor" (örn. mudurluk seviyesinde amirlik/ekipNo).
+    // NULL kullanılmıyor çünkü Postgres unique index'lerinde NULL != NULL, bu da
+    // ON CONFLICT upsert'in mudurluk/bolge seviyesi satırlarda eşleşmemesine yol açar.
+    amirlik: text("amirlik").notNull().default(""),
+    ekipNo: text("ekip_no").notNull().default(""),
     numerator: numeric("numerator", { precision: 14, scale: 2 }),
     denominator: numeric("denominator", { precision: 14, scale: 2 }),
     oran: numeric("oran", { precision: 10, scale: 4 }),
@@ -60,9 +63,10 @@ export const nvsMonthlyScores = pgTable(
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     period: text("period").notNull(),
     level: levelEnum("level").notNull(),
-    mudurluk: text("mudurluk"),
-    amirlik: text("amirlik"),
-    ekipNo: text("ekip_no"),
+    // Boş string ("") = "uygulanmıyor" (bkz. kpi_monthly_facts'teki aynı not).
+    mudurluk: text("mudurluk").notNull().default(""),
+    amirlik: text("amirlik").notNull().default(""),
+    ekipNo: text("ekip_no").notNull().default(""),
     ekipFirmaTipi: text("ekip_firma_tipi"),
     toplamPuan: numeric("toplam_puan", { precision: 10, scale: 4 }),
     components: jsonb("components").notNull().default({}),
