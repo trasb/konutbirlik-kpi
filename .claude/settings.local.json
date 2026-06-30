@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__13ee1dd1-5083-4121-9e91-323bd9a81eaf__search_files",
+      "Bash(python3 -c \"import pandas\")",
+      "Bash(python3 -c \"import pandas, openpyxl; print\\('ok', pandas.__version__, openpyxl.__version__\\)\")",
+      "Bash(python3)"
+    ]
+  }
+}
