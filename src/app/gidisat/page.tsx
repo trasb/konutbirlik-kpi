@@ -1,6 +1,8 @@
 import { Nav } from "@/components/Nav";
-import { DEFAULT_MUDURLUK } from "@/lib/data/dashboard";
+import { DEFAULT_MUDURLUK, getAllKpiDefinitionsWithGoals } from "@/lib/data/dashboard";
 import { getGidisatDetail, getGidisatRanking, listGidisatPeriods } from "@/lib/data/gidisat";
+import { rankColor, targetColor } from "@/lib/colors";
+import { TCODE_TO_KPI_CODE, extractTCode } from "@/lib/parsing/tcode-map";
 
 function fmt(n: number | null, digits = 1): string {
   if (n === null) return "—";
@@ -29,10 +31,12 @@ export default async function GidisatPage({
   }
 
   const period = sp.p ?? periods[0];
-  const [ranking, detail] = await Promise.all([
+  const [ranking, detail, kpiDefs] = await Promise.all([
     getGidisatRanking(period),
     getGidisatDetail(DEFAULT_MUDURLUK, period),
+    getAllKpiDefinitionsWithGoals(),
   ]);
+  const defByCode = new Map(kpiDefs.map((d) => [d.kpiCode, d]));
 
   return (
     <>
@@ -73,25 +77,32 @@ export default async function GidisatPage({
             </tr>
           </thead>
           <tbody>
-            {ranking.map((r) => (
-              <tr
-                key={r.mudurluk}
-                className={`border-b border-slate-100 ${
-                  r.mudurluk === DEFAULT_MUDURLUK ? "bg-amber-50 font-medium" : ""
-                }`}
-              >
-                <td className="py-1.5 pr-4">{r.sira ?? "—"}</td>
-                <td className="py-1.5 pr-4">
-                  {r.mudurluk}
-                  {r.mudurluk === DEFAULT_MUDURLUK && (
-                    <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-xs text-amber-900">
-                      KONUTBİRLİK&apos;in müdürlüğü
+            {ranking.map((r, i) => {
+              const colors = rankColor(i, ranking.length);
+              return (
+                <tr
+                  key={r.mudurluk}
+                  className={`border-b border-slate-100 ${
+                    r.mudurluk === DEFAULT_MUDURLUK ? "font-medium" : ""
+                  }`}
+                >
+                  <td className="py-1.5 pr-4">{r.sira ?? "—"}</td>
+                  <td className="py-1.5 pr-4">
+                    {r.mudurluk}
+                    {r.mudurluk === DEFAULT_MUDURLUK && (
+                      <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-xs text-amber-900">
+                        KONUTBİRLİK&apos;in müdürlüğü
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-1.5 pr-4">
+                    <span className="rounded px-2 py-0.5 font-medium" style={colors}>
+                      {fmt(r.skor, 2)}
                     </span>
-                  )}
-                </td>
-                <td className="py-1.5 pr-4">{fmt(r.skor, 2)}</td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -102,12 +113,32 @@ export default async function GidisatPage({
             </h2>
             <table className="w-full text-sm">
               <tbody>
-                {Object.entries(detail.kpiValues).map(([label, value]) => (
-                  <tr key={label} className="border-b border-slate-100">
-                    <td className="py-1.5 pr-4 text-slate-600">{label}</td>
-                    <td className="py-1.5 pr-4 font-medium">{fmt(value)}</td>
-                  </tr>
-                ))}
+                {Object.entries(detail.kpiValues).map(([label, value]) => {
+                  const tcode = extractTCode(label);
+                  const kpiCode = tcode ? TCODE_TO_KPI_CODE[tcode] : null;
+                  const def = kpiCode ? defByCode.get(kpiCode) : null;
+                  const colors = def
+                    ? targetColor(value, def.effectiveTarget, def.direction)
+                    : undefined;
+                  return (
+                    <tr key={label} className="border-b border-slate-100">
+                      <td className="py-1.5 pr-4 text-slate-600">{label}</td>
+                      <td className="py-1.5 pr-4">
+                        <span
+                          className={colors ? "rounded px-2 py-0.5 font-medium" : "font-medium"}
+                          style={colors}
+                        >
+                          {fmt(value)}
+                        </span>
+                        {def?.effectiveTarget !== null && def?.effectiveTarget !== undefined && (
+                          <span className="ml-2 text-xs text-slate-400">
+                            hedef {fmt(def.effectiveTarget)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

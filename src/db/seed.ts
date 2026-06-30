@@ -46,6 +46,11 @@ const OTHER_KPIS: KpiSeed[] = [
   { kpiCode: "T39_IPTV_ERKEN_ARIZA_YS", name: "IPTV Erken Arıza Oranı (Yeni Satış)", direction: "lower_better", targetGold: null, sourceFamily: "T39" },
   { kpiCode: "T41_DSL_PORT_TESTI", name: "DSL Port Testi Başarılı Yapılma Oranı", direction: "higher_better", targetGold: null, sourceFamily: "T41_43" },
   { kpiCode: "T43_FTTH_PORT_TESTI", name: "FTTH Port Testi Başarılı Yapılma Oranı", direction: "higher_better", targetGold: null, sourceFamily: "T41_43" },
+  { kpiCode: "T71_SES_ARIZA_SURE_UYUM", name: "Ses Arıza Giderme Sürelerine Uyum Oranı", direction: "higher_better", targetGold: null, sourceFamily: "GIDISAT_AMIRLIK" },
+  { kpiCode: "T16_TV_ARIZA_SURE_UYUM", name: "TV Arıza Giderme Sürelerine Uyum Oranı", direction: "higher_better", targetGold: null, sourceFamily: "GIDISAT_AMIRLIK" },
+  { kpiCode: "T28_DONUSUM_ERKEN_ARIZA", name: "Dönüşüm Erken Arıza Oranı", direction: "lower_better", targetGold: null, sourceFamily: "GIDISAT_AMIRLIK" },
+  { kpiCode: "T95_DSL_MUSTERI_BASINA_ARIZA", name: "DSL Müşteri Başına Arıza Oranı", direction: "lower_better", targetGold: null, sourceFamily: "GIDISAT_AMIRLIK" },
+  { kpiCode: "T96_FTTH_MUSTERI_BASINA_ARIZA", name: "FTTH Müşteri Başına Arıza Oranı", direction: "lower_better", targetGold: null, sourceFamily: "GIDISAT_AMIRLIK" },
 ];
 
 async function main() {

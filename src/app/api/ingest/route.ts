@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { gidisatMudurlukScores, kpiMonthlyFacts, nvsMonthlyScores } from "@/db/schema";
-import { sql } from "drizzle-orm";
+import { gidisatMudurlukScores, kpiDefinitions, kpiMonthlyFacts, nvsMonthlyScores } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
 import type { FactRow, NvsRow } from "@/lib/parsing/types";
 import type { GidisatRow } from "@/lib/parsing/gidisat";
+import type { GoldTarget } from "@/lib/parsing/gidisat-amirlik";
 
 type IngestPayload = {
   facts: FactRow[];
   nvsRows: NvsRow[];
   gidisatRows?: GidisatRow[];
+  goldTargets?: GoldTarget[];
 };
 
 const CHUNK_SIZE = 500;
@@ -157,5 +159,16 @@ export async function POST(req: NextRequest) {
     gidisatWritten += batch.length;
   }
 
-  return NextResponse.json({ factsWritten, nvsWritten, gidisatWritten });
+  let goldTargetsUpdated = 0;
+  const goldTargets = Array.isArray(payload.goldTargets) ? payload.goldTargets : [];
+  for (const g of goldTargets) {
+    if (!g.kpiCode || typeof g.target !== "number") continue;
+    const res = await db
+      .update(kpiDefinitions)
+      .set({ targetGold: String(g.target) })
+      .where(eq(kpiDefinitions.kpiCode, g.kpiCode));
+    goldTargetsUpdated += res.rowCount ?? 0;
+  }
+
+  return NextResponse.json({ factsWritten, nvsWritten, gidisatWritten, goldTargetsUpdated });
 }

@@ -9,6 +9,7 @@ import {
   listAmirlikler,
   listPeriods,
 } from "@/lib/data/dashboard";
+import { scoreColor } from "@/lib/colors";
 
 function parseMa(ma: string | undefined): { mudurluk: string; amirlik: string } {
   if (!ma || !ma.includes("||")) return { mudurluk: DEFAULT_MUDURLUK, amirlik: DEFAULT_AMIRLIK };
@@ -116,13 +117,23 @@ export default async function NvsPage({
                 </tr>
               </thead>
               <tbody>
-                {sortedComponents.map((c) => (
-                  <tr key={c.kpiCode} className="border-b border-slate-100">
-                    <td className="py-1.5 pr-4">{c.name}</td>
-                    <td className="py-1.5 pr-4">{c.oran === null ? "—" : `${fmt(c.oran)}%`}</td>
-                    <td className="py-1.5 pr-4 font-medium">{fmt(c.skor)}</td>
-                  </tr>
-                ))}
+                {sortedComponents.map((c) => {
+                  const colors = scoreColor(c.skor);
+                  return (
+                    <tr key={c.kpiCode} className="border-b border-slate-100">
+                      <td className="py-1.5 pr-4">{c.name}</td>
+                      <td className="py-1.5 pr-4">{c.oran === null ? "—" : `${fmt(c.oran)}%`}</td>
+                      <td className="py-1.5 pr-4">
+                        <span
+                          className={colors ? "rounded px-2 py-0.5 font-medium" : "font-medium"}
+                          style={colors}
+                        >
+                          {fmt(c.skor)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

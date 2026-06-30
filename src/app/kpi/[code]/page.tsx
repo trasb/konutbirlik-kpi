@@ -9,6 +9,7 @@ import {
   getKpiTrend,
   getLatestPeriod,
 } from "@/lib/data/dashboard";
+import { rankColor } from "@/lib/colors";
 
 function parseMa(ma: string | undefined): { mudurluk: string; amirlik: string } {
   if (!ma || !ma.includes("||")) return { mudurluk: DEFAULT_MUDURLUK, amirlik: DEFAULT_AMIRLIK };
@@ -19,17 +20,6 @@ function parseMa(ma: string | undefined): { mudurluk: string; amirlik: string } 
 function fmt(n: number | null, digits = 1): string {
   if (n === null) return "—";
   return n.toLocaleString("tr-TR", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
-}
-
-/** index=0 (en başarılı) yeşil, index=total-1 (en başarısız) kırmızı olacak şekilde gradyan üretir. */
-function rankColor(index: number, total: number): { backgroundColor: string; color: string } {
-  if (total <= 1) return { backgroundColor: "hsl(80 70% 94%)", color: "hsl(80 70% 25%)" };
-  const t = index / (total - 1); // 0..1
-  const hue = 120 * (1 - t); // 120=yeşil, 0=kırmızı
-  return {
-    backgroundColor: `hsl(${hue} 70% 94%)`,
-    color: `hsl(${hue} 70% 25%)`,
-  };
 }
 
 export default async function KpiDetailPage({

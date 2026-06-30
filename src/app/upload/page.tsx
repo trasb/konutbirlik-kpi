@@ -9,6 +9,11 @@ import {
 } from "@/lib/parsing/generic-separate-sheets";
 import { isMultiBlockWorkbook, parseMultiBlockWorkbook } from "@/lib/parsing/generic-multi-block";
 import { isGidisatWorkbook, parseGidisatWorkbook, type GidisatRow } from "@/lib/parsing/gidisat";
+import {
+  isGidisatAmirlikWorkbook,
+  parseGidisatAmirlikWorkbook,
+  type GoldTarget,
+} from "@/lib/parsing/gidisat-amirlik";
 import { MULTI_BLOCK_FAMILIES, SEPARATE_SHEETS_FAMILIES } from "@/lib/parsing/family-specs";
 import type { FactRow, NvsRow } from "@/lib/parsing/types";
 
@@ -16,6 +21,7 @@ type Parsed = {
   facts: FactRow[];
   nvsRows: NvsRow[];
   gidisatRows: GidisatRow[];
+  goldTargets: GoldTarget[];
   warnings: string[];
 };
 
@@ -24,7 +30,13 @@ type Status =
   | { kind: "parsing" }
   | { kind: "parsed"; result: Parsed; fileName: string; familyId: string }
   | { kind: "uploading" }
-  | { kind: "done"; factsWritten: number; nvsWritten: number; gidisatWritten: number }
+  | {
+      kind: "done";
+      factsWritten: number;
+      nvsWritten: number;
+      gidisatWritten: number;
+      goldTargetsUpdated: number;
+    }
   | { kind: "error"; message: string };
 
 function defaultPeriod(): string {
@@ -46,7 +58,7 @@ export default function UploadPage() {
         const r = parseNvsWorkbook(wb, file.name);
         setStatus({
           kind: "parsed",
-          result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], warnings: r.warnings },
+          result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], goldTargets: [], warnings: r.warnings },
           fileName: file.name,
           familyId: "NVS",
         });
@@ -57,9 +69,26 @@ export default function UploadPage() {
         const r = parseGidisatWorkbook(wb, period);
         setStatus({
           kind: "parsed",
-          result: { facts: [], nvsRows: [], gidisatRows: r.rows, warnings: r.warnings },
+          result: { facts: [], nvsRows: [], gidisatRows: r.rows, goldTargets: [], warnings: r.warnings },
           fileName: file.name,
           familyId: "GIDISAT",
+        });
+        return;
+      }
+
+      if (isGidisatAmirlikWorkbook(wb)) {
+        const r = parseGidisatAmirlikWorkbook(wb, file.name, period);
+        setStatus({
+          kind: "parsed",
+          result: {
+            facts: r.facts,
+            nvsRows: [],
+            gidisatRows: [],
+            goldTargets: r.goldTargets,
+            warnings: r.warnings,
+          },
+          fileName: file.name,
+          familyId: "GIDISAT_AMIRLIK",
         });
         return;
       }
@@ -76,7 +105,7 @@ export default function UploadPage() {
           const r = parseSeparateSheetsWorkbook(wb, spec, file.name, period);
           setStatus({
             kind: "parsed",
-            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], warnings: r.warnings },
+            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], goldTargets: [], warnings: r.warnings },
             fileName: file.name,
             familyId: spec.id,
           });
@@ -85,7 +114,7 @@ export default function UploadPage() {
           const r = parseMultiBlockWorkbook(wb, spec, file.name, period);
           setStatus({
             kind: "parsed",
-            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], warnings: r.warnings },
+            result: { facts: r.facts, nvsRows: r.nvsRows, gidisatRows: [], goldTargets: [], warnings: r.warnings },
             fileName: file.name,
             familyId: spec.id,
           });
@@ -103,7 +132,7 @@ export default function UploadPage() {
       setStatus({
         kind: "error",
         message:
-          "Bu dosya tanınan bir rapor ailesine uymuyor. Desteklenen dosyalar: NVS, GidişaTT Ara Bilgilendirme, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm Tamamlanma, T25/T33 (detaylı amirlik kırılımı).",
+          "Bu dosya tanınan bir rapor ailesine uymuyor. Desteklenen dosyalar: NVS, GidişaTT Ara Bilgilendirme, GidişaTT Amirlik, İnternet Arıza Randevuya Uyum, T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza, Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm Tamamlanma, T25/T33 (detaylı amirlik kırılımı).",
       });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -121,6 +150,7 @@ export default function UploadPage() {
           facts: status.result.facts,
           nvsRows: status.result.nvsRows,
           gidisatRows: status.result.gidisatRows,
+          goldTargets: status.result.goldTargets,
         }),
       });
       if (!res.ok) {
@@ -133,6 +163,7 @@ export default function UploadPage() {
         factsWritten: data.factsWritten,
         nvsWritten: data.nvsWritten,
         gidisatWritten: data.gidisatWritten ?? 0,
+        goldTargetsUpdated: data.goldTargetsUpdated ?? 0,
       });
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -143,10 +174,10 @@ export default function UploadPage() {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-12">
       <h1 className="text-xl font-semibold text-slate-900">Excel Yükle</h1>
       <p className="text-sm text-slate-500">
-        Desteklenen dosyalar: NVS, GidişaTT Ara Bilgilendirme, İnternet Arıza Randevuya Uyum,
-        T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV Erken Arıza,
-        Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8 Dönüşüm
-        Tamamlanma, T25/T33 (detaylı amirlik kırılımı).
+        Desteklenen dosyalar: NVS, GidişaTT Ara Bilgilendirme, GidişaTT Amirlik, İnternet Arıza
+        Randevuya Uyum, T19/T99, T27/T30, T41/T43, T4/T5/T7/T70/T29, T37 Kronik Arıza, T39 IPTV
+        Erken Arıza, Teyitten Dönen Arıza, T34 IPTV Tekrar Eden Arıza, T18 Başarılı EliTT, T8
+        Dönüşüm Tamamlanma, T25/T33 (detaylı amirlik kırılımı).
       </p>
 
       <div>
@@ -209,7 +240,9 @@ export default function UploadPage() {
       {status.kind === "done" && (
         <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
           Kaydedildi: {status.factsWritten} fact, {status.nvsWritten} NVS satırı,{" "}
-          {status.gidisatWritten} GidişaTT satırı.
+          {status.gidisatWritten} GidişaTT satırı
+          {status.goldTargetsUpdated > 0 && `, ${status.goldTargetsUpdated} Altın hedef güncellendi`}
+          .
         </p>
       )}
 
