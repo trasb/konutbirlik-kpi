@@ -4,7 +4,7 @@ import { DEFAULT_AMIRLIK, DEFAULT_MUDURLUK } from "@/lib/constants";
 import { getAllKpiDefinitionsWithGoals, listAmirlikler } from "@/lib/data/dashboard";
 import { getGidisatAmirlikDetail, listGidisatAmirlikPeriods } from "@/lib/data/gidisat-amirlik";
 import { targetColor } from "@/lib/colors";
-import { sortByKpiOrder } from "@/lib/kpi-order";
+import { GIDISAT_AMIRLIK_KPI_ORDER, sortByKpiOrder } from "@/lib/kpi-order";
 
 function parseMa(ma: string | undefined): { mudurluk: string; amirlik: string } {
   if (!ma || !ma.includes("||")) return { mudurluk: DEFAULT_MUDURLUK, amirlik: DEFAULT_AMIRLIK };
@@ -79,30 +79,34 @@ export default async function GidisatAmirlikPage({
               </tr>
             </thead>
             <tbody>
-              {sortByKpiOrder(
-                Object.entries(detail.kpiValues).map(([kpiCode, value]) => ({ kpiCode, value })),
-              ).map(({ kpiCode, value }) => {
-                const def = defByCode.get(kpiCode);
-                const colors = def ? targetColor(value, def.effectiveTarget, def.direction) : undefined;
-                return (
-                  <tr key={kpiCode} className="border-b border-slate-100">
-                    <td className="py-1.5 pr-4 text-slate-600">{def?.name ?? kpiCode}</td>
-                    <td className="py-1.5 pr-4">
-                      <span
-                        className={colors ? "rounded px-2 py-0.5 font-medium" : "font-medium"}
-                        style={colors}
-                      >
-                        {fmt(value)}%
-                      </span>
-                    </td>
-                    <td className="py-1.5 pr-4 text-xs text-slate-400">
-                      {def?.effectiveTarget !== null && def?.effectiveTarget !== undefined
-                        ? `${fmt(def.effectiveTarget)}%`
-                        : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
+              {/* Dosyanın kapsadığı 21 KPI'nın hepsi listelenir — bu amirlik için boş olan
+                  bir kolon "—" ile gösterilir, satır tamamen gizlenmez. */}
+              {sortByKpiOrder(GIDISAT_AMIRLIK_KPI_ORDER.map((kpiCode) => ({ kpiCode }))).map(
+                ({ kpiCode }) => {
+                  const def = defByCode.get(kpiCode);
+                  const value = detail.kpiValues[kpiCode] ?? null;
+                  const colors =
+                    def && value !== null ? targetColor(value, def.effectiveTarget, def.direction) : undefined;
+                  return (
+                    <tr key={kpiCode} className="border-b border-slate-100">
+                      <td className="py-1.5 pr-4 text-slate-600">{def?.name ?? kpiCode}</td>
+                      <td className="py-1.5 pr-4">
+                        <span
+                          className={colors ? "rounded px-2 py-0.5 font-medium" : "font-medium"}
+                          style={colors}
+                        >
+                          {value === null ? "—" : `${fmt(value)}%`}
+                        </span>
+                      </td>
+                      <td className="py-1.5 pr-4 text-xs text-slate-400">
+                        {def?.effectiveTarget !== null && def?.effectiveTarget !== undefined
+                          ? `${fmt(def.effectiveTarget)}%`
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                },
+              )}
             </tbody>
           </table>
         )}
