@@ -54,7 +54,7 @@ export default async function NvsPage({
     getNvsComponents(mudurluk, amirlik, period),
   ]);
 
-  const sortedComponents = [...components].sort((a, b) => (b.skor ?? 0) - (a.skor ?? 0));
+  const sortedComponents = components; // getNvsComponents zaten GidişaTT sırasıyla döner
 
   return (
     <>

@@ -95,3 +95,79 @@ export async function listRawStatsPeriods(kpiCode: string): Promise<string[]> {
     .where(eq(rawIsKayitlari.kpiCode, kpiCode));
   return rows.map((r) => r.period).sort().reverse();
 }
+
+const PENCERE_GUN = 30;
+
+export type ErkenArizaOlay = { tarih: string; ekipNo: string; kayitNo: string };
+export type DusmeNoktasi = {
+  tarih: string; // o tarihte düşen olayların tarihi (YYYY-MM-DD)
+  dusenSayisi: number;
+  kalanUyumsuz: number;
+  projekteOran: number | null; // bu düşüşten sonra oran (toplam sabit kabul edilir)
+};
+
+export type ErkenArizaPenceresi = {
+  olaylar: ErkenArizaOlay[];
+  dusmeNoktalari: DusmeNoktasi[];
+  toplam: number;
+  guncelUyumsuz: number;
+};
+
+/**
+ * "Erken arıza" gibi KPI'larda bir olay oluştuğu andan itibaren ~30 gün boyunca oranı
+ * etkilemeye devam edip sonra "düşüyor". Bu fonksiyon, mevcut uyumsuz (erken arıza) olaylarının
+ * tarihlerine bakıp her birinin ne zaman pencereden düşeceğini ve düştüğünde oranın ne olacağını
+ * hesaplar. Sadeleştirme: payda (toplam iş sayısı) sabit kabul edilir, sadece pay (uyumsuz sayısı)
+ * azalır — yeni kurulum/arıza girişi olasılığı hesaba katılmaz.
+ */
+export async function getErkenArizaPenceresi(
+  kpiCode: string,
+  period: string,
+  pencereGun = PENCERE_GUN,
+): Promise<ErkenArizaPenceresi | null> {
+  const rows = await db
+    .select()
+    .from(rawIsKayitlari)
+    .where(and(eq(rawIsKayitlari.kpiCode, kpiCode), eq(rawIsKayitlari.period, period)));
+
+  if (rows.length === 0) return null;
+
+  const toplam = rows.length;
+  const olaylar = rows
+    .filter((r) => r.uyumlu === 0 && r.tamamlanmaTarihi)
+    .map((r) => ({
+      tarih: r.tamamlanmaTarihi!.toISOString().slice(0, 10),
+      ekipNo: r.ekipNo,
+      kayitNo: r.kayitNo,
+    }))
+    .sort((a, b) => a.tarih.localeCompare(b.tarih));
+
+  const guncelUyumsuz = olaylar.length;
+  if (guncelUyumsuz === 0) {
+    return { olaylar: [], dusmeNoktalari: [], toplam, guncelUyumsuz: 0 };
+  }
+
+  // Her olayın düşme tarihi = olay tarihi + pencereGun
+  const dusmeByTarih = new Map<string, number>();
+  for (const o of olaylar) {
+    const d = new Date(o.tarih + "T00:00:00Z");
+    d.setUTCDate(d.getUTCDate() + pencereGun);
+    const dusmeTarih = d.toISOString().slice(0, 10);
+    dusmeByTarih.set(dusmeTarih, (dusmeByTarih.get(dusmeTarih) ?? 0) + 1);
+  }
+
+  const sortedDusmeTarihleri = [...dusmeByTarih.keys()].sort();
+  let kalan = guncelUyumsuz;
+  const dusmeNoktalari: DusmeNoktasi[] = sortedDusmeTarihleri.map((tarih) => {
+    const dusen = dusmeByTarih.get(tarih)!;
+    kalan -= dusen;
+    return {
+      tarih,
+      dusenSayisi: dusen,
+      kalanUyumsuz: kalan,
+      projekteOran: toplam > 0 ? (kalan / toplam) * 100 : null,
+    };
+  });
+
+  return { olaylar, dusmeNoktalari, toplam, guncelUyumsuz };
+}

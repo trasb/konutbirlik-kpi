@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Nav } from "@/components/Nav";
 import { getKpiDefinition } from "@/lib/data/dashboard";
-import { getRawStats, listRawStatsPeriods } from "@/lib/data/raw-stats";
+import { getErkenArizaPenceresi, getRawStats, listRawStatsPeriods } from "@/lib/data/raw-stats";
 import { rankColor } from "@/lib/colors";
 import { DEFAULT_AMIRLIK } from "@/lib/constants";
 
@@ -39,11 +39,26 @@ export default async function SurecPage({
   }
 
   const period = sp.p ?? periods[0];
-  const stats = await getRawStats(kpiCode, period);
+  const [stats, pencere] = await Promise.all([
+    getRawStats(kpiCode, period),
+    getErkenArizaPenceresi(kpiCode, period),
+  ]);
   if (!stats) notFound();
 
   const uyumOrani = stats.toplam > 0 ? (stats.uyumlu / stats.toplam) * 100 : null;
   const maxHistogram = Math.max(1, ...stats.histogram.map((h) => h.count));
+
+  // Olay tarihine göre günlük gruplama (kaç tanesi hangi gün geldi)
+  const olayByGun = new Map<string, number>();
+  for (const o of pencere?.olaylar ?? []) {
+    olayByGun.set(o.tarih, (olayByGun.get(o.tarih) ?? 0) + 1);
+  }
+  const olayGunleri = [...olayByGun.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  function fmtTarih(iso: string): string {
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}.${y}`;
+  }
 
   return (
     <>
@@ -121,6 +136,72 @@ export default async function SurecPage({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {pencere && pencere.guncelUyumsuz > 0 && (
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h2 className="mb-1 text-sm font-medium text-slate-700">
+              30 Günlük Pencere — Erken Arıza Olayları
+            </h2>
+            <p className="mb-3 text-xs text-slate-500">
+              Bu KPI'da bir olay, oluştuğu tarihten itibaren ~30 gün boyunca orana dahil kalıp
+              sonra düşüyor. Aşağıda hangi gün kaç olay geldiği ve her birinin ne zaman
+              "düşeceği" gösteriliyor. Hesap, payda (toplam {pencere.toplam}) sabit kalacak
+              şekilde basitleştirildi — yeni olay/iş girişi varsayılmıyor.
+            </p>
+
+            <h3 className="mb-1 text-xs font-medium text-slate-600">Olayların geldiği günler</h3>
+            <table className="mb-4 w-full text-sm">
+              <thead>
+                <tr className="border-b border-amber-200 text-left text-slate-500">
+                  <th className="py-1 pr-4">Tarih</th>
+                  <th className="py-1 pr-4">O Gün Gelen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {olayGunleri.map(([tarih, sayi]) => (
+                  <tr key={tarih} className="border-b border-amber-100">
+                    <td className="py-1 pr-4">{fmtTarih(tarih)}</td>
+                    <td className="py-1 pr-4 font-medium">{sayi}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <h3 className="mb-1 text-xs font-medium text-slate-600">
+              Düşme takvimi (oluştuğu tarih + 30 gün)
+            </h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-amber-200 text-left text-slate-500">
+                  <th className="py-1 pr-4">Düşme Tarihi</th>
+                  <th className="py-1 pr-4">Düşen</th>
+                  <th className="py-1 pr-4">Kalan Uyumsuz</th>
+                  <th className="py-1 pr-4">Projekte Oran</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-amber-100 text-slate-400">
+                  <td className="py-1 pr-4">bugün ({period})</td>
+                  <td className="py-1 pr-4">—</td>
+                  <td className="py-1 pr-4">{pencere.guncelUyumsuz}</td>
+                  <td className="py-1 pr-4">
+                    {fmt((pencere.guncelUyumsuz / pencere.toplam) * 100)}%
+                  </td>
+                </tr>
+                {pencere.dusmeNoktalari.map((d) => (
+                  <tr key={d.tarih} className="border-b border-amber-100">
+                    <td className="py-1 pr-4 font-medium">{fmtTarih(d.tarih)}</td>
+                    <td className="py-1 pr-4 text-red-700">-{d.dusenSayisi}</td>
+                    <td className="py-1 pr-4">{d.kalanUyumsuz}</td>
+                    <td className="py-1 pr-4 font-medium text-green-700">
+                      {fmt(d.projekteOran)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 

@@ -57,6 +57,7 @@ const HEADER_ALIASES = {
     "Isemri Tamamlanma Zamanı",
     "Kapama Zamanı",
     "İşemri Tamamlanma Tarihi (DD.MM.YYYY HH:MM:SS)",
+    "İlk Arıza Zamanı", // T36/T28: erken arıza olayının kendi tarihi (30 günlük pencere projeksiyonu için)
   ],
 };
 

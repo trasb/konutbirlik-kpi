@@ -4,6 +4,7 @@ import { DEFAULT_AMIRLIK, DEFAULT_MUDURLUK } from "@/lib/constants";
 import { getAllKpiDefinitionsWithGoals, listAmirlikler } from "@/lib/data/dashboard";
 import { getGidisatAmirlikDetail, listGidisatAmirlikPeriods } from "@/lib/data/gidisat-amirlik";
 import { targetColor } from "@/lib/colors";
+import { sortByKpiOrder } from "@/lib/kpi-order";
 
 function parseMa(ma: string | undefined): { mudurluk: string; amirlik: string } {
   if (!ma || !ma.includes("||")) return { mudurluk: DEFAULT_MUDURLUK, amirlik: DEFAULT_AMIRLIK };
@@ -78,7 +79,9 @@ export default async function GidisatAmirlikPage({
               </tr>
             </thead>
             <tbody>
-              {Object.entries(detail.kpiValues).map(([kpiCode, value]) => {
+              {sortByKpiOrder(
+                Object.entries(detail.kpiValues).map(([kpiCode, value]) => ({ kpiCode, value })),
+              ).map(({ kpiCode, value }) => {
                 const def = defByCode.get(kpiCode);
                 const colors = def ? targetColor(value, def.effectiveTarget, def.direction) : undefined;
                 return (

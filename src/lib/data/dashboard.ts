@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { kpiDefinitions, kpiMonthlyFacts, nvsMonthlyScores, goals } from "@/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
+import { sortByKpiOrder } from "@/lib/kpi-order";
 
 export { DEFAULT_MUDURLUK, DEFAULT_AMIRLIK } from "@/lib/constants";
 
@@ -89,7 +90,7 @@ export async function getKpiCards(
   const goalByCode = new Map(goalRows.map((g) => [g.kpiCode, num(g.targetValue)]));
   const factByCode = new Map(factRows.map((f) => [f.kpiCode, f]));
 
-  return defs.map((def) => {
+  const cards = defs.map((def) => {
     const fact = factByCode.get(def.kpiCode);
     const target = goalByCode.get(def.kpiCode) ?? num(def.targetGold);
     const oran = fact ? num(fact.oran) : null;
@@ -124,6 +125,7 @@ export async function getKpiCards(
       onTarget,
     };
   });
+  return sortByKpiOrder(cards);
 }
 
 export async function getKpiDefinition(kpiCode: string) {
@@ -226,7 +228,7 @@ export async function getNvsComponents(
     skor: v.skor,
   }));
 
-  return { toplamPuan: num(score.toplamPuan), components };
+  return { toplamPuan: num(score.toplamPuan), components: sortByKpiOrder(components) };
 }
 
 export async function getAllKpiDefinitionsWithGoals() {
@@ -235,10 +237,11 @@ export async function getAllKpiDefinitionsWithGoals() {
     db.select().from(goals),
   ]);
   const goalByCode = new Map(goalRows.map((g) => [g.kpiCode, num(g.targetValue)]));
-  return defs.map((d) => ({
+  const list = defs.map((d) => ({
     ...d,
     targetGold: num(d.targetGold),
     effectiveTarget: goalByCode.get(d.kpiCode) ?? num(d.targetGold),
     hasOverride: goalByCode.has(d.kpiCode),
   }));
+  return sortByKpiOrder(list);
 }
