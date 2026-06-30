@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-12">
@@ -15,8 +17,14 @@ export default function Home() {
         </form>
       </div>
       <p className="text-sm text-slate-500">
-        İskelet hazır — dashboard, yükleme ve hedef ekranları sırayla eklenecek.
+        Dashboard sırayla eklenecek. Şimdilik aylık Excel dosyalarını yükleyebilirsin.
       </p>
+      <Link
+        href="/upload"
+        className="w-fit rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+      >
+        Excel Yükle
+      </Link>
     </main>
   );
 }
