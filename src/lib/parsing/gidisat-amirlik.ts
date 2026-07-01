@@ -1,9 +1,13 @@
 import * as XLSX from "xlsx";
 import { FactRow, ParseResult, normalizeMudurluk, toNumber, toText } from "./types";
 
-// Sütun indeksi -> KPI kodu eşlemesi. "GidişaTT - Amirlik" dosyası sabit bir şablon;
-// sütun sırası satır0 (grup başlığı) + satır1 (T-kodu) ile doğrulandı.
-const COLUMN_MAP: { col: number; kpiCode: string }[] = [
+// Sütun indeksi -> KPI kodu eşlemesi. "GidişaTT - Amirlik" dosyası sabit bir şablon.
+//
+// Excel'deki bazı KPI başlıkları 2 kolonluk merge (örn. T19: kol 18-19). Header satırında
+// (satır 4 = Altın eşikleri) bu KPI'ların değeri merge'in ilk kolonunda (kol 18). Ama
+// amirlik veri satırlarında oran değeri merge'in bir önceki kolona (kol 17) yazılmış.
+// Bu nedenle `col` (oran verisi) ile `targetCol` (Altın eşiği satırı) farklı olabilir.
+const COLUMN_MAP: { col: number; targetCol?: number; kpiCode: string }[] = [
   { col: 10, kpiCode: "T4_KURULUM_SURE_UYUM" },
   { col: 11, kpiCode: "T29_DONUSUM_SURE_UYUM" },
   { col: 12, kpiCode: "T70_SES_KURULUM_SURE_UYUM" },
@@ -11,19 +15,19 @@ const COLUMN_MAP: { col: number; kpiCode: string }[] = [
   { col: 14, kpiCode: "T71_SES_ARIZA_SURE_UYUM" },
   { col: 15, kpiCode: "T13_ARIZA_SURE_UYUM" },
   { col: 16, kpiCode: "T16_TV_ARIZA_SURE_UYUM" },
-  { col: 18, kpiCode: "T19_ILK_RANDEVU_UYUM" },
-  { col: 20, kpiCode: "T99_TV_RANDEVU_UYUM" },
-  { col: 22, kpiCode: "T25_KURULUM_TAMAMLANMA" },
-  { col: 24, kpiCode: "T8_DONUSUM_TAMAMLANMA" },
-  { col: 26, kpiCode: "T27_IPTV_KURULUM_TAMAMLANMA" },
+  { col: 17, targetCol: 18, kpiCode: "T19_ILK_RANDEVU_UYUM" },
+  { col: 19, targetCol: 20, kpiCode: "T99_TV_RANDEVU_UYUM" },
+  { col: 21, targetCol: 22, kpiCode: "T25_KURULUM_TAMAMLANMA" },
+  { col: 23, targetCol: 24, kpiCode: "T8_DONUSUM_TAMAMLANMA" },
+  { col: 25, targetCol: 26, kpiCode: "T27_IPTV_KURULUM_TAMAMLANMA" },
   { col: 28, kpiCode: "T33_TEKRAR_EDEN_ARIZA" },
   { col: 29, kpiCode: "T32_EV_ICI_TEKRAR" },
   { col: 30, kpiCode: "T34_IPTV_TEKRAR_ARIZA" },
   { col: 31, kpiCode: "T37_KRONIK_ARIZA" },
-  { col: 33, kpiCode: "T36_ERKEN_ARIZA" },
-  { col: 34, kpiCode: "T28_DONUSUM_ERKEN_ARIZA" },
-  { col: 36, kpiCode: "T39_IPTV_ERKEN_ARIZA_YS" },
-  { col: 38, kpiCode: "T95_DSL_MUSTERI_BASINA_ARIZA" },
+  { col: 32, targetCol: 33, kpiCode: "T36_ERKEN_ARIZA" },
+  { col: 33, targetCol: 34, kpiCode: "T28_DONUSUM_ERKEN_ARIZA" },
+  { col: 35, targetCol: 36, kpiCode: "T39_IPTV_ERKEN_ARIZA_YS" },
+  { col: 37, targetCol: 38, kpiCode: "T95_DSL_MUSTERI_BASINA_ARIZA" },
   { col: 40, kpiCode: "T96_FTTH_MUSTERI_BASINA_ARIZA" },
 ];
 
@@ -82,9 +86,10 @@ export function parseGidisatAmirlikWorkbook(
   const rows = sheetToRows(workbook);
 
   const altinRow = rows[ALTIN_ROW_INDEX] ?? [];
-  const goldTargets: GoldTarget[] = COLUMN_MAP.map(({ col, kpiCode }) => ({
+  // Altın eşikleri header pozisyonunda (targetCol) okunur; veri satırlarındaki oran ise col'da.
+  const goldTargets: GoldTarget[] = COLUMN_MAP.map(({ col, targetCol, kpiCode }) => ({
     kpiCode,
-    target: lastThreshold(altinRow[col]),
+    target: lastThreshold(altinRow[targetCol ?? col]),
   })).filter((g): g is GoldTarget => g.target !== null);
 
   for (let r = DATA_START_ROW; r < rows.length; r++) {
